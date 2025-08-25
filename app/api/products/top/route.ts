@@ -1,4 +1,6 @@
 // app/api/products/top/route.ts
+export const runtime = "nodejs";
+
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
