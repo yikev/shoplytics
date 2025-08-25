@@ -1,23 +1,43 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
+
 const prisma = new PrismaClient();
+
+type SortKey = "totalSpent" | "ordersCount" | "createdAt";
 
 export async function GET(req: Request) {
   const tenantId = "tenant_demo";
   const url = new URL(req.url);
+
   const page = Math.max(1, Number(url.searchParams.get("page") ?? 1));
   const pageSize = Math.min(50, Number(url.searchParams.get("pageSize") ?? 20));
-  const sort = url.searchParams.get("sort") ?? "totalSpent";
-  const dir = (url.searchParams.get("dir") ?? "desc").toLowerCase() === "asc" ? "asc" : "desc";
+
+  const sortParam = (url.searchParams.get("sort") ?? "totalSpent") as SortKey;
+  const dirParam: Prisma.SortOrder =
+    url.searchParams.get("dir") === "asc" ? "asc" : "desc";
+
+  // Map dynamic key to a typed orderBy object
+  const orderBy: Prisma.CustomerOrderByWithRelationInput =
+    sortParam === "totalSpent"
+      ? { totalSpent: dirParam }
+      : sortParam === "ordersCount"
+      ? { ordersCount: dirParam }
+      : { createdAt: dirParam };
 
   const [total, rows] = await Promise.all([
     prisma.customer.count({ where: { tenantId } }),
     prisma.customer.findMany({
       where: { tenantId },
-      orderBy: { [sort]: dir as any },
+      orderBy,
       skip: (page - 1) * pageSize,
       take: pageSize,
-      select: { id: true, email: true, ordersCount: true, totalSpent: true, createdAt: true },
+      select: {
+        id: true,
+        email: true,
+        ordersCount: true,
+        totalSpent: true,
+        createdAt: true,
+      },
     }),
   ]);
 
@@ -25,9 +45,6 @@ export async function GET(req: Request) {
     total,
     page,
     pageSize,
-    items: rows.map(r => ({
-      ...r,
-      totalSpent: Number(r.totalSpent),
-    })),
+    items: rows.map((r) => ({ ...r, totalSpent: Number(r.totalSpent) })),
   });
 }
