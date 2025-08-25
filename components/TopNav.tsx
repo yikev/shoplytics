@@ -1,3 +1,4 @@
+// components/TopNav.tsx
 "use client";
 
 import Link from "next/link";
@@ -16,6 +17,7 @@ const links = [
 export default function TopNav() {
   const pathname = usePathname();
   const { data: session } = useSession();
+  const tenant = session?.user?.tenant_id ?? "tenant_demo";
 
   return (
     <div className="w-full border-b bg-white">
@@ -37,14 +39,8 @@ export default function TopNav() {
             ))}
           </Group>
           <Group gap="sm">
-            <Text size="sm" c="dimmed">
-              {(session?.user as any)?.tenant_id ?? "tenant_demo"}
-            </Text>
-            <Button
-              size="xs"
-              variant="light"
-              onClick={() => signOut({ callbackUrl: "/login" })}
-            >
+            <Text size="sm" c="dimmed">{tenant}</Text>
+            <Button size="xs" variant="light" onClick={() => signOut({ callbackUrl: "/login" })}>
               Sign out
             </Button>
           </Group>
