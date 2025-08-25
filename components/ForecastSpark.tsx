@@ -14,6 +14,13 @@ import {
 
 type Point = { date?: string; revenue?: number; forecast?: number; low?: number; high?: number };
 
+enum SeriesKey {
+  Revenue = "revenue",
+  Forecast = "forecast",
+  Low = "low",
+  High = "high",
+}
+
 export default function ForecastSpark() {
   const [data, setData] = useState<Point[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -23,17 +30,20 @@ export default function ForecastSpark() {
 
     fetch("/api/insights/forecast", { signal: ac.signal })
       .then((r) => (r.ok ? r.json() : Promise.reject(r.statusText)))
-      .then(({ last90, forecast, band }) => {
-        const forecastSeries = forecast.map((y: number, i: number) => ({
+      .then(({ last90, forecast, band }: { last90: { date: string; revenue: number }[]; forecast: number[]; band?: { low: number; high: number }[] }) => {
+        const past: Point[] = last90.map((p) => ({ date: p.date, revenue: p.revenue }));
+        const future: Point[] = forecast.map((y, i) => ({
           date: `F+${i + 1}`,
           forecast: y,
           low: band?.[i]?.low,
           high: band?.[i]?.high,
         }));
-        setData([...(last90 as Point[]), ...forecastSeries]);
+        setData([...past, ...future]);
       })
-      .catch((e) => {
-        if ((e as any)?.name !== "AbortError") setErr(String(e));
+      .catch((e: unknown) => {
+        if (!(e instanceof DOMException && e.name === "AbortError")) {
+          setErr(String(e));
+        }
       });
 
     return () => ac.abort();
@@ -72,11 +82,11 @@ export default function ForecastSpark() {
             <YAxis />
             <Tooltip />
             {/* Confidence band (plots low/high as translucent areas) */}
-            <Area type="monotone" dataKey="high" dot={false} />
-            <Area type="monotone" dataKey="low" dot={false} />
+            <Area type="monotone" dataKey={SeriesKey.High} dot={false} connectNulls />
+            <Area type="monotone" dataKey={SeriesKey.Low} dot={false} connectNulls />
             {/* Actuals and forecast */}
-            <Line type="monotone" dataKey="revenue" />
-            <Line type="monotone" dataKey="forecast" />
+            <Line type="monotone" dataKey={SeriesKey.Revenue} connectNulls />
+            <Line type="monotone" dataKey={SeriesKey.Forecast} connectNulls />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
