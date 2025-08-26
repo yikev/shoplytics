@@ -54,7 +54,7 @@ export async function GET(req: Request) {
     const where: Prisma.CustomerWhereInput = { tenantId };
     if (q) where.email = { contains: q, mode: "insensitive" };
 
-    // Segment filtering (high/mid/low buckets)
+    // Segment filtering
     if (segment) {
       const basics = await prisma.customer.findMany({
         where: { tenantId },
@@ -79,7 +79,6 @@ export async function GET(req: Request) {
         })
         .map((r) => r.id);
 
-      // If none matched, force empty result with an impossible IN list
       where.id = ids.length ? { in: ids } : { in: ["__no_match__"] };
     }
 

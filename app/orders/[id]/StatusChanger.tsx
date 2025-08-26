@@ -29,7 +29,6 @@ export default function StatusChanger({
       <Select
         value={value}
         onChange={(v) => {
-          // Mantine can pass null; disallow deselect to avoid that
           if (v) setValue(v as Status);
         }}
         data={[
@@ -38,7 +37,6 @@ export default function StatusChanger({
           { value: "CANCELLED", label: "CANCELLED" },
         ]}
         allowDeselect={false}
-        // prevent accidental scroll-change
         comboboxProps={{ withinPortal: true }}
       />
 
@@ -55,7 +53,6 @@ export default function StatusChanger({
             });
 
             if (!r.ok) {
-              // rollback if server rejects
               setValue(status);
               alert("Failed to update status");
               return;

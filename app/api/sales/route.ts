@@ -28,7 +28,6 @@ export async function GET(req: Request) {
     since
   );
 
-  // Return a simple array like [{ date: '2025-07-01', revenue: 1234.56 }, ...]
   const data = rows.map((r) => ({
     date: r.d.toISOString().slice(0, 10),
     revenue: Number(r.revenue || 0),

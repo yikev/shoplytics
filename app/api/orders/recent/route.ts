@@ -16,7 +16,7 @@ export async function GET(req: Request) {
       select: {
         id: true,
         createdAt: true,
-        status: true,                  // ✅ include status
+        status: true, 
         total: true,
         customer: { select: { email: true } },
       },
@@ -25,7 +25,7 @@ export async function GET(req: Request) {
     const items = orders.map((o) => ({
       id: o.id,
       createdAt: o.createdAt.toISOString(),
-      status: o.status,               // ✅ pass through
+      status: o.status,     
       total: Number(o.total ?? 0),
       email: o.customer?.email ?? "—",
     }));

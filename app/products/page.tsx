@@ -42,8 +42,6 @@ export default function ProductsPage() {
   const [dir, setDir] = useState<Dir>("desc");
   const [rows, setRows] = useState<Row[] | null>(null);
   const [loading, setLoading] = useState(false);
-
-  // simple debounce so we don’t fetch on every keystroke
   const debouncedQ = useMemo(() => q, [q]);
 
   useEffect(() => {
@@ -55,7 +53,7 @@ export default function ProductsPage() {
       sort,
       dir,
       limit: "20",
-      range: "30d", // or "90d" if you wire a toggle
+      range: "30d",
     });
     fetch(`/api/products/top?${params.toString()}`, { signal: ac.signal, cache: "no-store" })
       .then((r) => (r.ok ? r.json() : Promise.reject(r.statusText)))

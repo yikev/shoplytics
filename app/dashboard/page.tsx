@@ -9,7 +9,7 @@ import SalesChart from "@/components/SalesChart";
 import RecentOrders from "@/components/RecentOrders";
 
 type PageProps = {
-  // 🔴 In Next 15, searchParams is a Promise in server components
+  // In Next 15, searchParams is a Promise in server components
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
@@ -20,7 +20,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   const email = session.user?.email ?? "guest";
   const tenantId = session.user?.tenant_id ?? "tenant_demo";
 
-  // ✅ await searchParams before using it
+  // await searchParams before using it
   const sp = await searchParams;
   const rangeParam = (Array.isArray(sp.range) ? sp.range[0] : sp.range) as
     | "30d"

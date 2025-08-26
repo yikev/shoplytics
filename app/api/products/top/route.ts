@@ -34,7 +34,6 @@ export async function GET(req: Request) {
   const sincePrevious = new Date(now - 2 * days * 24 * 60 * 60 * 1000);
 
   try {
-    // ---------- helpers ----------
     type AggRow = {
       id: string;
       title: string;
@@ -48,7 +47,6 @@ export async function GET(req: Request) {
       margin: number;
     };
 
-    // NOTE: Use *quoted* Prisma names for tables/columns.
     // "OrderItem" (oi): "quantity", "unitPrice", "orderId", "productId"
     // "Order" (o): "tenantId", "createdAt"
     // "Product" (p): "id","title","sku","price","cost","inventory","tenantId","createdAt"
@@ -99,7 +97,7 @@ export async function GET(req: Request) {
       return { ...r, deltaRevenuePct, deltaUnitsPct };
     });
 
-    // Sort (safe in JS)
+    // Sort
     const sorted = [...merged].sort((a, b) => {
       const mult = dir === "asc" ? 1 : -1;
       switch (sort) {

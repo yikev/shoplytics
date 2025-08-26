@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import ForecastSpark from "@/components/ForecastSpark";
-import SegmentsCard from "@/components/SegmentsCard"; // ✅ NOTE: SegmentsCard, not SegmentsPie
+import SegmentsCard from "@/components/SegmentsCard";
 import { Grid, GridCol, Title, Space } from "@mantine/core";
 
 export default async function InsightsPage() {

@@ -49,8 +49,8 @@ export async function GET(req: Request) {
     const ordersPrev = ordersPrevious.length;
     const aovPrev = ordersPrev ? revenuePrev / ordersPrev : 0;
 
-    // Demo-only conversion (assume constant sessions across periods)
-    const sessions = days * 1000; // pretend 1k sessions/day
+    // Demo-only conversion 
+    const sessions = days * 1000;
     const conversion = sessions ? (orders / sessions) * 100 : 0;
     const conversionPrev = sessions ? (ordersPrev / sessions) * 100 : 0;
 
