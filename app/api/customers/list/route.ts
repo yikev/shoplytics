@@ -1,62 +1,108 @@
+// app/api/customers/list/route.ts
 export const runtime = "nodejs";
 import { NextResponse } from "next/server";
-import { PrismaClient, Prisma } from "@prisma/client";
-const prisma = new PrismaClient();
+import { prisma } from "@/lib/prisma";
+
+type CustAgg = { id: string; total: number; orders: number; recency: number };
+function quantile(arr: number[], p: number) {
+  if (!arr.length) return 0;
+  const i = Math.max(0, Math.min(arr.length - 1, Math.floor((arr.length - 1) * p)));
+  return [...arr].sort((a, b) => a - b)[i];
+}
+function labelCustomers(rows: CustAgg[]) {
+  if (!rows.length) return { labeled: [] as (CustAgg & { seg_rec: number; seg_tot: number; seg_ord: number })[] };
+
+  const recArr = rows.map((r) => r.recency);
+  const totArr = rows.map((r) => r.total);
+  const ordArr = rows.map((r) => r.orders);
+  const cut = (v: number, arr: number[]) => {
+    const q33 = quantile(arr, 0.33);
+    const q66 = quantile(arr, 0.66);
+    return v <= q33 ? 0 : v <= q66 ? 1 : 2;
+  };
+
+  const labeled = rows.map((r) => ({
+    ...r,
+    seg_rec: cut(r.recency, recArr),
+    seg_tot: cut(r.total, totArr),
+    seg_ord: cut(r.orders, ordArr),
+  }));
+
+  return { labeled };
+}
 
 type SortKey = "totalSpent" | "ordersCount" | "createdAt";
 
 export async function GET(req: Request) {
-  const tenantId = "tenant_demo";
   const url = new URL(req.url);
+  const page = Math.max(1, Number(url.searchParams.get("page") ?? "1"));
+  const pageSize = Math.min(100, Math.max(1, Number(url.searchParams.get("pageSize") ?? "20")));
+  const sort = (url.searchParams.get("sort") as SortKey) || "totalSpent";
+  const dir = (url.searchParams.get("dir") === "asc" ? "asc" : "desc") as "asc" | "desc";
+  const q = (url.searchParams.get("q") || "").trim();
+  const segment = url.searchParams.get("segment") as "high" | "mid" | "low" | null;
 
-  const page = Math.max(1, Number(url.searchParams.get("page") ?? 1));
-  const pageSize = Math.min(50, Number(url.searchParams.get("pageSize") ?? 20));
-  const q = (url.searchParams.get("q") ?? "").trim();
+  const tenantId = "tenant_demo";
 
-  const sortParam = (url.searchParams.get("sort") ?? "totalSpent") as SortKey;
-  const dirParam: Prisma.SortOrder =
-    url.searchParams.get("dir") === "asc" ? "asc" : "desc";
+  try {
+    const where: any = { tenantId };
+    if (q) where.email = { contains: q, mode: "insensitive" };
 
-  const orderBy: Prisma.CustomerOrderByWithRelationInput =
-    sortParam === "totalSpent"
-      ? { totalSpent: dirParam }
-      : sortParam === "ordersCount"
-      ? { ordersCount: dirParam }
-      : { createdAt: dirParam };
+    // Segment filtering
+    if (segment) {
+      const basics = await prisma.customer.findMany({
+        where: { tenantId },
+        select: { id: true, totalSpent: true, ordersCount: true, createdAt: true },
+      });
 
-  const where: Prisma.CustomerWhereInput = {
-    tenantId,
-    ...(q
-      ? {
-          email: {
-            contains: q,
-            mode: "insensitive",
-          },
-        }
-      : {}),
-  };
+      const now = Date.now();
+      const rows: CustAgg[] = basics.map((c) => ({
+        id: c.id,
+        total: Number(c.totalSpent ?? 0),
+        orders: c.ordersCount ?? 0,
+        recency: Math.max(1, Math.floor((now - c.createdAt.getTime()) / (1000 * 60 * 60 * 24))),
+      }));
 
-  const [total, rows] = await Promise.all([
-    prisma.customer.count({ where }),
-    prisma.customer.findMany({
-      where,
-      orderBy,
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      select: {
-        id: true,
-        email: true,
-        ordersCount: true,
-        totalSpent: true,
-        createdAt: true,
-      },
-    }),
-  ]);
+      const { labeled } = labelCustomers(rows);
+      const ids = labeled
+        .filter((r) => {
+          const score = r.seg_tot + r.seg_ord - r.seg_rec;
+          if (segment === "high") return score >= 2;
+          if (segment === "mid") return score === 1;
+          return score <= 0; // low
+        })
+        .map((r) => r.id);
 
-  return NextResponse.json({
-    total,
-    page,
-    pageSize,
-    items: rows.map((r) => ({ ...r, totalSpent: Number(r.totalSpent) })),
-  });
+      // If none matched, force an empty result
+      where.id = { in: ids }; // Prisma treats in: [] as no matches
+    }
+
+    const [total, rawItems] = await Promise.all([
+      prisma.customer.count({ where }),
+      prisma.customer.findMany({
+        where,
+        orderBy: { [sort]: dir },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        select: {
+          id: true,
+          email: true,
+          ordersCount: true,
+          totalSpent: true,   // Decimal/string
+          createdAt: true,
+        },
+      }),
+    ]);
+
+    // 🔧 Normalize totalSpent to number for the UI
+    const items = rawItems.map((c) => ({
+      ...c,
+      totalSpent: Number(c.totalSpent ?? 0),
+    }));
+
+    return NextResponse.json({ total, page, pageSize, items });
+  } catch (e) {
+    console.error("[/api/customers/list] error:", e);
+    return NextResponse.json({ error: "customers_list_failed" }, { status: 500 });
+  }
 }

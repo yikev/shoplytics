@@ -9,6 +9,12 @@ generator client {
   provider = "prisma-client-js"
 }
 
+enum OrderStatus {
+  PAID
+  PENDING
+  CANCELLED
+}
+
 model Tenant {
   id        String    @id @default(cuid())
   name      String
@@ -64,8 +70,12 @@ model Order {
   tax        Decimal    @db.Decimal(12, 2)
   shipping   Decimal    @db.Decimal(12, 2)
   total      Decimal    @db.Decimal(12, 2)
+  status     OrderStatus  @default(PAID)   // ✅ new
   createdAt  DateTime   @default(now())
   items      OrderItem[]
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, status])  
 }
 
 model OrderItem {
