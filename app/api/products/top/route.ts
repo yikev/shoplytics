@@ -11,9 +11,9 @@ type SortKey = "revenue" | "units" | "margin" | "inventory" | "createdAt";
 function rangeToDays(r?: string): number {
   return r === "90d" ? 90 : 30;
 }
-function sum(nums: number[]) {
-  return nums.reduce((s, n) => s + n, 0);
-}
+// function sum(nums: number[]) {
+//   return nums.reduce((s, n) => s + n, 0);
+// }
 function pctDelta(curr: number, prev: number): number | null {
   if (!isFinite(prev) || prev === 0) return null;
   return ((curr - prev) / prev) * 100;

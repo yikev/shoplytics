@@ -55,7 +55,7 @@ export default async function OrderDetailPage(props: { params: Promise<{ id: str
       </Group>
 
       <Paper withBorder p="lg" radius="md">
-        // app/orders/[id]/page.tsx (snippet)
+        {/* app/orders/[id]/page.tsx (snippet) */}
         <Group justify="space-between">
         <Group>
             <Text><b>Customer:</b> {order.customer?.email ?? "—"}</Text>

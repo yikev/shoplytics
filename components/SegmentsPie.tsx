@@ -26,7 +26,7 @@ export default function SegmentsPie({ data = [] }: { data?: Slice[] }) {
   };
 
   // Tooltip: (value, name) => ReactNode
-  const tooltipFmt = (value: ValueType, _name: NameType): [string, string] => {
+  const tooltipFmt = (value: ValueType, ..._rest: unknown[]): [string, string] => {
     return [`${Number(value)} customers`, "Count"];
   };
 

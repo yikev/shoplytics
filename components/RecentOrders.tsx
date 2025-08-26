@@ -4,13 +4,20 @@ import { useEffect, useState } from "react";
 import { Card, Group, Text, Table, Badge, Skeleton, Button } from "@mantine/core";
 import Link from "next/link";
 
+type OrderStatus = "PENDING" | "PAID" | "CANCELLED";
+
 type Row = {
   id: string;
-  createdAt: string; // we’ll stringify for transport
-  status: string;
+  createdAt: string; // ISO string
+  status: OrderStatus;
   total: number;
   email: string;
 };
+
+type ApiResp = { items: Array<Partial<Row>> };
+
+const statusColor = (s: OrderStatus) =>
+  s === "PAID" ? "green" : s === "CANCELLED" ? "red" : "yellow";
 
 export default function RecentOrders({ limit = 10 }: { limit?: number }) {
   const [rows, setRows] = useState<Row[] | null>(null);
@@ -20,18 +27,23 @@ export default function RecentOrders({ limit = 10 }: { limit?: number }) {
     const ac = new AbortController();
     setErr(null);
     setRows(null);
+
     fetch(`/api/orders/recent?limit=${limit}`, { signal: ac.signal, cache: "no-store" })
-      .then(r => (r.ok ? r.json() : Promise.reject(r.statusText)))
-      .then((json) => {
-        const items: Row[] = (json.items || []).map((i: any) => ({
-          ...i,
-          createdAt: i.createdAt ?? new Date().toISOString(),
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.statusText)))
+      .then((json: ApiResp) => {
+        const items: Row[] = (json.items ?? []).map((i) => ({
+          id: String(i.id),
+          email: String(i.email ?? "—"),
+          status: (i.status as OrderStatus) ?? "PENDING",
+          total: Number(i.total ?? 0),
+          createdAt: String(i.createdAt ?? new Date().toISOString()),
         }));
         setRows(items);
       })
       .catch((e) => {
         if (!(e instanceof DOMException && e.name === "AbortError")) setErr(String(e));
       });
+
     return () => ac.abort();
   }, [limit]);
 
@@ -39,7 +51,9 @@ export default function RecentOrders({ limit = 10 }: { limit?: number }) {
     <Card withBorder radius="md" p="md">
       <Group justify="space-between" mb="sm">
         <Text fw={700}>Recent Orders</Text>
-        <Button component={Link} href="/orders" size="xs" variant="light">View all</Button>
+        <Button component={Link} href="/orders" size="xs" variant="light">
+          View all
+        </Button>
       </Group>
 
       {err && <Text c="red">Failed to load: {err}</Text>}
@@ -52,7 +66,9 @@ export default function RecentOrders({ limit = 10 }: { limit?: number }) {
         </>
       )}
 
-      {rows && (
+      {rows && rows.length === 0 && <Text c="dimmed">No recent orders</Text>}
+
+      {rows && rows.length > 0 && (
         <Table striped highlightOnHover>
           <Table.Thead>
             <Table.Tr>
@@ -67,15 +83,19 @@ export default function RecentOrders({ limit = 10 }: { limit?: number }) {
             {rows.map((r) => (
               <Table.Tr key={r.id}>
                 <Table.Td>
-                  <Text fw={600}>#{r.id}</Text>
+                  <Link href={`/orders/${r.id}`}>
+                    <Text fw={600}>#{r.id}</Text>
+                  </Link>
                 </Table.Td>
                 <Table.Td>{r.email}</Table.Td>
                 <Table.Td>
-                  <Badge variant="light" color={r.status === "paid" ? "green" : r.status === "refunded" ? "yellow" : "blue"}>
+                  <Badge variant="light" size="sm" color={statusColor(r.status)}>
                     {r.status}
                   </Badge>
                 </Table.Td>
-                <Table.Td ta="right">${r.total.toLocaleString(undefined, { maximumFractionDigits: 0 })}</Table.Td>
+                <Table.Td ta="right">
+                  ${r.total.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                </Table.Td>
                 <Table.Td>{new Date(r.createdAt).toLocaleDateString()}</Table.Td>
               </Table.Tr>
             ))}

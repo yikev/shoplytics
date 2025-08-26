@@ -48,7 +48,7 @@ export async function GET(req: Request) {
       // search by order id or customer email
       where.OR = [
         { id: { contains: q, mode: "insensitive" } },
-        { customer: { email: { contains: q, mode: "insensitive" } } },
+        { customer: { is: { email: { contains: q, mode: "insensitive" } } } },
       ];
     }
 
