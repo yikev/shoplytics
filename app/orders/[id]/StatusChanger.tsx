@@ -1,39 +1,65 @@
 // app/orders/[id]/StatusChanger.tsx
 "use client";
+
 import { useState, useTransition } from "react";
 import { Group, Badge, Select, Button } from "@mantine/core";
 
-export default function StatusChanger({
-  id, status,
-}: { id: string; status: "PENDING" | "PAID" | "CANCELLED" }) {
-  const [value, setValue] = useState(status);
-  const [isPending, start] = useTransition();
+type Status = "PENDING" | "PAID" | "CANCELLED";
 
-  const color = value === "PAID" ? "green" : value === "PENDING" ? "yellow" : "red";
+export default function StatusChanger({
+  id,
+  status,
+}: {
+  id: string;
+  status: Status;
+}) {
+  const [value, setValue] = useState<Status>(status);
+  const [isPending, startTransition] = useTransition();
+
+  const changed = value !== status;
+  const color =
+    value === "PAID" ? "green" : value === "CANCELLED" ? "red" : "yellow";
 
   return (
     <Group>
-      <Badge color={color} variant="light">{value}</Badge>
+      <Badge color={color} variant="light">
+        {value}
+      </Badge>
+
       <Select
         value={value}
-        onChange={(v) => v && setValue(v as any)}
+        onChange={(v) => {
+          // Mantine can pass null; disallow deselect to avoid that
+          if (v) setValue(v as Status);
+        }}
         data={[
           { value: "PENDING", label: "PENDING" },
           { value: "PAID", label: "PAID" },
           { value: "CANCELLED", label: "CANCELLED" },
         ]}
+        allowDeselect={false}
+        // prevent accidental scroll-change
+        comboboxProps={{ withinPortal: true }}
       />
+
       <Button
         size="xs"
-        disabled={isPending}
+        disabled={isPending || !changed}
         onClick={() =>
-          start(async () => {
+          startTransition(async () => {
             const r = await fetch(`/api/orders/${id}`, {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ status: value }),
+              cache: "no-store",
             });
-            if (!r.ok) alert("Failed to update status");
+
+            if (!r.ok) {
+              // rollback if server rejects
+              setValue(status);
+              alert("Failed to update status");
+              return;
+            }
           })
         }
       >

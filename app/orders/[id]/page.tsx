@@ -55,15 +55,16 @@ export default async function OrderDetailPage(props: { params: Promise<{ id: str
       </Group>
 
       <Paper withBorder p="lg" radius="md">
+        // app/orders/[id]/page.tsx (snippet)
         <Group justify="space-between">
-          <Group>
+        <Group>
             <Text><b>Customer:</b> {order.customer?.email ?? "—"}</Text>
             <Divider orientation="vertical" />
             <Text><b>Placed:</b> {new Date(order.createdAt).toLocaleString()}</Text>
-          </Group>
+        </Group>
 
-          {/* Only the interactive status control (shows its own badge) */}
-          <StatusChanger id={order.id} status={order.status as "PENDING" | "PAID" | "CANCELLED"} />
+        {/* Only the island shows & controls the current status */}
+        <StatusChanger id={order.id} status={order.status as any} />
         </Group>
 
         <Divider my="md" />
