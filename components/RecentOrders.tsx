@@ -14,10 +14,23 @@ type Row = {
   email: string;
 };
 
-type ApiResp = { items: Array<Partial<Row>> };
+// Shape we expect from the API; fields can be missing, so all optional
+type ApiItem = {
+  id?: unknown;
+  createdAt?: unknown;
+  status?: unknown;
+  total?: unknown;
+  email?: unknown;
+};
+type ApiResp = { items?: ApiItem[] };
 
 const statusColor = (s: OrderStatus) =>
   s === "PAID" ? "green" : s === "CANCELLED" ? "red" : "yellow";
+
+function normalizeStatus(v: unknown): OrderStatus {
+  const s = String(v ?? "").toUpperCase();
+  return s === "PAID" || s === "PENDING" || s === "CANCELLED" ? (s as OrderStatus) : "PENDING";
+}
 
 export default function RecentOrders({ limit = 10 }: { limit?: number }) {
   const [rows, setRows] = useState<Row[] | null>(null);
@@ -31,10 +44,10 @@ export default function RecentOrders({ limit = 10 }: { limit?: number }) {
     fetch(`/api/orders/recent?limit=${limit}`, { signal: ac.signal, cache: "no-store" })
       .then((r) => (r.ok ? r.json() : Promise.reject(r.statusText)))
       .then((json: ApiResp) => {
-        const items: Row[] = (json.items ?? []).map((i) => ({
-          id: String(i.id),
+        const items = (json.items ?? []).map<Row>((i) => ({
+          id: String(i.id ?? ""),
           email: String(i.email ?? "—"),
-          status: (i.status as OrderStatus) ?? "PENDING",
+          status: normalizeStatus(i.status),
           total: Number(i.total ?? 0),
           createdAt: String(i.createdAt ?? new Date().toISOString()),
         }));

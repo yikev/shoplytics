@@ -1,4 +1,3 @@
-// app/api/orders/recent/route.ts
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
@@ -6,9 +5,7 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
-  const limit = Math.min(parseInt(url.searchParams.get("limit") || "10", 10), 50) || 10;
-
-  // TODO: swap with real tenant from session (kept demo for now)
+  const limit = Math.min(Number(url.searchParams.get("limit") ?? 10), 50);
   const tenantId = "tenant_demo";
 
   try {
@@ -19,14 +16,16 @@ export async function GET(req: Request) {
       select: {
         id: true,
         createdAt: true,
+        status: true,                  // ✅ include status
         total: true,
         customer: { select: { email: true } },
       },
     });
 
-    const items = orders.map(o => ({
+    const items = orders.map((o) => ({
       id: o.id,
-      createdAt: o.createdAt,
+      createdAt: o.createdAt.toISOString(),
+      status: o.status,               // ✅ pass through
       total: Number(o.total ?? 0),
       email: o.customer?.email ?? "—",
     }));
@@ -34,6 +33,6 @@ export async function GET(req: Request) {
     return NextResponse.json({ items });
   } catch (e) {
     console.error("[/api/orders/recent] error:", e);
-    return NextResponse.json({ error: "orders_recent_failed" }, { status: 500 });
+    return NextResponse.json({ error: "recent_orders_failed" }, { status: 500 });
   }
 }
