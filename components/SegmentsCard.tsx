@@ -1,127 +1,90 @@
-// components/SegmentsCard.tsx
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Card, Center, Loader, Text, Button, Group } from "@mantine/core";
+import { useEffect, useState } from "react";
+import { Card, Center, Loader, Text } from "@mantine/core";
 import SegmentsPie, { Slice } from "@/components/SegmentsPie";
 
 type ApiBuckets = { low?: number; mid?: number; high?: number };
 type ApiShape =
-  | { buckets?: ApiBuckets; customers?: unknown[] }
-  | { segments?: Slice[] | Record<string, number> }
-  | Record<string, number>
+  | { buckets?: ApiBuckets }
+  | { segments?: Slice[] }
   | Slice[];
 
-function isBucketsShape(x: unknown): x is { buckets: ApiBuckets } {
-  return (
-    !!x &&
-    typeof x === "object" &&
-    "buckets" in (x as any) &&
-    (typeof (x as any).buckets === "object" && (x as any).buckets !== null)
+// Type guards to avoid `any`
+function isSliceArray(v: unknown): v is Slice[] {
+  return Array.isArray(v) && v.every(
+    (x) => x && typeof x === "object" && "name" in x && "value" in x
   );
 }
-
-function isSegmentsArray(x: unknown): x is { segments: Slice[] } {
-  return !!x && typeof x === "object" && Array.isArray((x as any).segments);
+function hasBuckets(v: unknown): v is { buckets: ApiBuckets } {
+  return !!v && typeof v === "object" && "buckets" in (v as Record<string, unknown>);
 }
-
-function isSegmentsMap(x: unknown): x is { segments: Record<string, number> } {
-  return (
-    !!x &&
-    typeof x === "object" &&
-    "segments" in (x as any) &&
-    !Array.isArray((x as any).segments) &&
-    typeof (x as any).segments === "object"
-  );
-}
-
-function isPlainMap(x: unknown): x is Record<string, number> {
-  return (
-    !!x &&
-    typeof x === "object" &&
-    !Array.isArray(x) &&
-    !("buckets" in (x as any)) &&
-    !("segments" in (x as any))
-  );
-}
-
-function toSlices(json: ApiShape): Slice[] | null {
-  if (Array.isArray(json)) return json as Slice[];
-
-  if (isBucketsShape(json)) {
-    const b = json.buckets;
-    return [
-      { name: "High value", value: Number(b.high ?? 0) },
-      { name: "Mid value", value: Number(b.mid ?? 0) },
-      { name: "Low value", value: Number(b.low ?? 0) },
-    ];
-  }
-
-  if (isSegmentsArray(json)) {
-    return json.segments as Slice[];
-  }
-
-  if (isSegmentsMap(json)) {
-    return Object.entries(json.segments).map(([name, value]) => ({
-      name,
-      value: Number(value),
-    }));
-  }
-
-  if (isPlainMap(json)) {
-    return Object.entries(json).map(([name, value]) => ({
-      name,
-      value: Number(value ?? 0),
-    }));
-  }
-
-  return null;
+function hasSegments(v: unknown): v is { segments: Slice[] } {
+  return !!v && typeof v === "object" && "segments" in (v as Record<string, unknown>);
 }
 
 export default function SegmentsCard() {
   const [data, setData] = useState<Slice[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const abortRef = useRef<AbortController | null>(null);
-
-  const load = useCallback(async () => {
-    abortRef.current?.abort();
-    const ac = new AbortController();
-    abortRef.current = ac;
-
-    setErr(null);
-    setLoading(true);
-    setData(null);
-
-    try {
-      const r = await fetch("/api/insights/segments", { signal: ac.signal, cache: "no-store" });
-      if (!r.ok) {
-        const body = await r.text().catch(() => "");
-        console.error("segments fetch failed:", r.status, body);
-        throw new Error(`HTTP ${r.status}`);
-      }
-      const json: ApiShape = await r.json();
-      const slices = toSlices(json);
-      if (!slices) throw new Error("Unexpected segments response shape");
-
-      // If everything sums to zero, pass an empty array to show the "No segment data" state.
-      const total = slices.reduce((s, d) => s + (Number(d.value) || 0), 0);
-      setData(total > 0 ? slices : []);
-    } catch (e) {
-      if (!(e instanceof DOMException && e.name === "AbortError")) {
-        setErr(e instanceof Error ? e.message : String(e));
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
 
   useEffect(() => {
-    load();
-    return () => abortRef.current?.abort();
-  }, [load]);
+    const ac = new AbortController();
 
-  if (loading && !data && !err) {
+    (async () => {
+      try {
+        setErr(null);
+        setData(null);
+
+        const r = await fetch("/api/insights/segments", {
+          signal: ac.signal,
+          cache: "no-store",
+        });
+
+        if (!r.ok) {
+          const body = await r.text().catch(() => "");
+          console.error("segments fetch failed:", r.status, body);
+          throw new Error(`HTTP ${r.status}`);
+        }
+
+        const json: unknown = await r.json();
+
+        let slices: Slice[] | null = null;
+
+        if (isSliceArray(json)) {
+          slices = json;
+        } else if (hasSegments(json) && isSliceArray(json.segments)) {
+          slices = json.segments;
+        } else if (hasBuckets(json) && json.buckets) {
+          const b = json.buckets;
+          const toNum = (n: unknown) => Number(n ?? 0);
+          slices = [
+            { name: "High value", value: toNum(b.high) },
+            { name: "Mid value", value: toNum(b.mid) },
+            { name: "Low value", value: toNum(b.low) },
+          ];
+        }
+
+        if (!slices) throw new Error("Unexpected segments response shape");
+        setData(slices);
+      } catch (e) {
+        if (!(e instanceof DOMException && e.name === "AbortError")) {
+          setErr(e instanceof Error ? e.message : String(e));
+        }
+      }
+    })();
+
+    return () => ac.abort();
+  }, []);
+
+  if (err) {
+    return (
+      <Card withBorder radius="md" p="md">
+        <Text c="red">Failed to load segments</Text>
+      </Card>
+    );
+  }
+
+  if (!data) {
     return (
       <Card withBorder radius="md" p="md">
         <Center style={{ height: 240 }}>
@@ -131,18 +94,5 @@ export default function SegmentsCard() {
     );
   }
 
-  if (err) {
-    return (
-      <Card withBorder radius="md" p="md">
-        <Group justify="space-between" align="center">
-          <Text c="red">Failed to load segments</Text>
-          <Button size="xs" variant="light" onClick={load}>
-            Retry
-          </Button>
-        </Group>
-      </Card>
-    );
-  }
-
-  return <SegmentsPie data={data ?? []} />;
+  return <SegmentsPie data={data} />;
 }
