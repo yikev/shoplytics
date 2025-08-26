@@ -3,6 +3,7 @@ export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 
 type Dir = "asc" | "desc";
 type SortKey = "createdAt" | "total" | "status";
@@ -16,7 +17,12 @@ function toInt(v: string | null, def: number) {
 function parseDate(v: string | null): Date | undefined {
   if (!v) return undefined;
   const d = new Date(v);
-  return isNaN(d.getTime()) ? undefined : d;
+  return Number.isNaN(d.getTime()) ? undefined : d;
+}
+
+function parseStatus(s: string | null): Status | undefined {
+  if (s === "PENDING" || s === "PAID" || s === "CANCELLED") return s;
+  return undefined;
 }
 
 export async function GET(req: Request) {
@@ -29,23 +35,17 @@ export async function GET(req: Request) {
   const dir: Dir = url.searchParams.get("dir") === "asc" ? "asc" : "desc";
   const q = (url.searchParams.get("q") || "").trim();
 
-  // NEW: optional filters
-  const statusParam = url.searchParams.get("status") as Status | null;
-  const status: Status | undefined =
-    statusParam && ["PENDING", "PAID", "CANCELLED"].includes(statusParam)
-      ? (statusParam as Status)
-      : undefined;
-
-  const from = parseDate(url.searchParams.get("from")); // ISO like 2024-01-01
-  const to = parseDate(url.searchParams.get("to"));     // exclusive upper bound
+  const status = parseStatus(url.searchParams.get("status"));
+  const from = parseDate(url.searchParams.get("from"));
+  const to = parseDate(url.searchParams.get("to"));
 
   const tenantId = "tenant_demo";
 
   try {
-    const where: any = { tenantId };
+    // ---- where ----
+    const where: Prisma.OrderWhereInput = { tenantId };
 
     if (q) {
-      // search by order id or customer email
       where.OR = [
         { id: { contains: q, mode: "insensitive" } },
         { customer: { is: { email: { contains: q, mode: "insensitive" } } } },
@@ -56,22 +56,30 @@ export async function GET(req: Request) {
 
     if (from || to) {
       where.createdAt = {
-        ...(from && { gte: from }),
-        ...(to && { lt: to }),
+        ...(from ? { gte: from } : {}),
+        ...(to ? { lt: to } : {}),
       };
     }
+
+    // ---- orderBy (typed, no index signature) ----
+    const orderBy: Prisma.OrderOrderByWithRelationInput =
+      sort === "createdAt"
+        ? { createdAt: dir }
+        : sort === "total"
+        ? { total: dir }
+        : { status: dir };
 
     const [total, orders] = await Promise.all([
       prisma.order.count({ where }),
       prisma.order.findMany({
         where,
-        orderBy: { [sort]: dir }, // supports enum ordering too
+        orderBy,
         skip: (page - 1) * pageSize,
         take: pageSize,
         select: {
           id: true,
-          total: true,          // Decimal
-          status: true,         // <-- include status
+          total: true,
+          status: true,
           createdAt: true,
           customer: { select: { email: true } },
         },

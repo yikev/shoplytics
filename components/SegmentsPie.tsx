@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Card, Text, Center } from "@mantine/core";
 import { ResponsiveContainer, PieChart, Pie, Tooltip, Legend } from "recharts";
 import type { LegendPayload } from "recharts/types/component/DefaultLegendContent";
-import type { NameType, ValueType } from "recharts/types/component/DefaultTooltipContent";
+import type { ValueType } from "recharts/types/component/DefaultTooltipContent";
 
 export type Slice = { name: string; value: number };
 
@@ -17,18 +17,22 @@ export default function SegmentsPie({ data = [] }: { data?: Slice[] }) {
     [data]
   );
 
-  // Legend: (value, entry) => ReactNode
-  const legendFmt = (value: string, entry: LegendPayload): string => {
-    const payload = entry?.payload as Partial<Slice> | undefined;
-    const count = Number(payload?.value ?? 0);
-    const pct = total ? Math.round((count / total) * 100) : 0;
-    return `${value} — ${count} (${pct}%)`;
-  };
+  // Legend: (value, entry, index) => ReactNode
+  const legendFmt = useCallback(
+    (value: string, entry: LegendPayload): string => {
+      const payload = entry?.payload as Slice | undefined;
+      const count = Number(payload?.value ?? 0);
+      const pct = total ? Math.round((count / total) * 100) : 0;
+      return `${value} — ${count} (${pct}%)`;
+    },
+    [total]
+  );
 
-  // Tooltip: (value, name) => ReactNode
-  const tooltipFmt = (value: ValueType, ..._rest: unknown[]): [string, string] => {
-    return [`${Number(value)} customers`, "Count"];
-  };
+  // Tooltip: (value, name, ...rest) => ReactNode | [value, name]
+  const tooltipFmt = useCallback(
+    (value: ValueType): [string, string] => [`${Number(value)} customers`, "Count"],
+    []
+  );
 
   const labelToKey = useCallback((label: string) => {
     const s = label.toLowerCase();
@@ -38,7 +42,7 @@ export default function SegmentsPie({ data = [] }: { data?: Slice[] }) {
     return "";
   }, []);
 
-  // Avoid typing the Pie callback's data arg; use the index to look up our Slice
+  // Recharts passes (data, index) to onClick; we only need index
   const onSliceClick = useCallback(
     (_: unknown, index: number) => {
       const slice = data[index];

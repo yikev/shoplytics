@@ -5,10 +5,6 @@ import { Card, Center, Loader, Text } from "@mantine/core";
 import SegmentsPie, { Slice } from "@/components/SegmentsPie";
 
 type ApiBuckets = { low?: number; mid?: number; high?: number };
-type ApiShape =
-  | { buckets?: ApiBuckets }
-  | { segments?: Slice[] }
-  | Slice[];
 
 // Type guards to avoid `any`
 function isSliceArray(v: unknown): v is Slice[] {

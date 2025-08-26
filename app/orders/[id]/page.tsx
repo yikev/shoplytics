@@ -4,9 +4,32 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-// ⬇️ removed Badge
 import { Paper, Title, Text, Group, Table, Divider, Button } from "@mantine/core";
 import StatusChanger from "./StatusChanger";
+
+type OrderStatus = "PENDING" | "PAID" | "CANCELLED";
+
+type OrderItemRow = {
+  id: string;
+  quantity: number;
+  unitPrice: unknown; // Prisma Decimal
+  discount: unknown;  // Prisma Decimal
+  product: { id: string; sku: string | null; title: string };
+};
+
+type OrderDetail = {
+  id: string;
+  createdAt: Date;
+  status: OrderStatus;
+  subtotal: unknown; // Prisma Decimal
+  tax: unknown;      // Prisma Decimal
+  shipping: unknown; // Prisma Decimal
+  total: unknown;    // Prisma Decimal
+  customer: { email: string | null; id: string } | null;
+  items: OrderItemRow[];
+};
+
+const toNum = (v: unknown) => Number(v ?? 0);
 
 export default async function OrderDetailPage(props: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
@@ -14,7 +37,7 @@ export default async function OrderDetailPage(props: { params: Promise<{ id: str
 
   const { id } = await props.params;
 
-  const order = await prisma.order.findFirst({
+  const rawOrder = await prisma.order.findFirst({
     where: { id, tenantId: "tenant_demo" },
     select: {
       id: true,
@@ -38,11 +61,15 @@ export default async function OrderDetailPage(props: { params: Promise<{ id: str
     },
   });
 
+  const order = rawOrder as unknown as OrderDetail | null;
+
   if (!order) {
     return (
       <div className="p-6">
         <Title order={2}>Order not found</Title>
-        <Button mt="md" component={Link} href="/orders">Back to orders</Button>
+        <Button mt="md" component={Link} href="/orders">
+          Back to orders
+        </Button>
       </div>
     );
   }
@@ -51,20 +78,26 @@ export default async function OrderDetailPage(props: { params: Promise<{ id: str
     <div className="p-6">
       <Group justify="space-between" mb="md">
         <Title order={2}>Order {order.id}</Title>
-        <Button component={Link} href="/orders" variant="light">Back to orders</Button>
+        <Button component={Link} href="/orders" variant="light">
+          Back to orders
+        </Button>
       </Group>
 
       <Paper withBorder p="lg" radius="md">
-        {/* app/orders/[id]/page.tsx (snippet) */}
+        {/* Header row: customer + placed + status changer */}
         <Group justify="space-between">
-        <Group>
-            <Text><b>Customer:</b> {order.customer?.email ?? "—"}</Text>
+          <Group>
+            <Text>
+              <b>Customer:</b> {order.customer?.email ?? "—"}
+            </Text>
             <Divider orientation="vertical" />
-            <Text><b>Placed:</b> {new Date(order.createdAt).toLocaleString()}</Text>
-        </Group>
+            <Text>
+              <b>Placed:</b> {new Date(order.createdAt).toLocaleString()}
+            </Text>
+          </Group>
 
-        {/* Only the island shows & controls the current status */}
-        <StatusChanger id={order.id} status={order.status as any} />
+          {/* Only the island shows & controls the current status */}
+          <StatusChanger id={order.id} status={order.status} />
         </Group>
 
         <Divider my="md" />
@@ -82,8 +115,8 @@ export default async function OrderDetailPage(props: { params: Promise<{ id: str
           </thead>
           <tbody>
             {order.items.map((it) => {
-              const unit = Number(it.unitPrice);
-              const disc = Number(it.discount);
+              const unit = toNum(it.unitPrice);
+              const disc = toNum(it.discount);
               const line = it.quantity * unit - disc;
               return (
                 <tr key={it.id}>
@@ -101,11 +134,11 @@ export default async function OrderDetailPage(props: { params: Promise<{ id: str
 
         <Group justify="flex-end" mt="md">
           <Paper p="md" withBorder radius="md">
-            <Text>Subtotal: <b>${Number(order.subtotal).toFixed(2)}</b></Text>
-            <Text>Tax: <b>${Number(order.tax).toFixed(2)}</b></Text>
-            <Text>Shipping: <b>${Number(order.shipping).toFixed(2)}</b></Text>
+            <Text>Subtotal: <b>${toNum(order.subtotal).toFixed(2)}</b></Text>
+            <Text>Tax: <b>${toNum(order.tax).toFixed(2)}</b></Text>
+            <Text>Shipping: <b>${toNum(order.shipping).toFixed(2)}</b></Text>
             <Divider my={6} />
-            <Text size="lg">Total: <b>${Number(order.total).toFixed(2)}</b></Text>
+            <Text size="lg">Total: <b>${toNum(order.total).toFixed(2)}</b></Text>
           </Paper>
         </Group>
       </Paper>

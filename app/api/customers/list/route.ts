@@ -1,27 +1,33 @@
 // app/api/customers/list/route.ts
 export const runtime = "nodejs";
+
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 
 type CustAgg = { id: string; total: number; orders: number; recency: number };
+
 function quantile(arr: number[], p: number) {
   if (!arr.length) return 0;
   const i = Math.max(0, Math.min(arr.length - 1, Math.floor((arr.length - 1) * p)));
   return [...arr].sort((a, b) => a - b)[i];
 }
+
 function labelCustomers(rows: CustAgg[]) {
-  if (!rows.length) return { labeled: [] as (CustAgg & { seg_rec: number; seg_tot: number; seg_ord: number })[] };
+  type Labeled = CustAgg & { seg_rec: number; seg_tot: number; seg_ord: number };
+  if (!rows.length) return { labeled: [] as Labeled[] };
 
   const recArr = rows.map((r) => r.recency);
   const totArr = rows.map((r) => r.total);
   const ordArr = rows.map((r) => r.orders);
+
   const cut = (v: number, arr: number[]) => {
     const q33 = quantile(arr, 0.33);
     const q66 = quantile(arr, 0.66);
     return v <= q33 ? 0 : v <= q66 ? 1 : 2;
   };
 
-  const labeled = rows.map((r) => ({
+  const labeled: Labeled[] = rows.map((r) => ({
     ...r,
     seg_rec: cut(r.recency, recArr),
     seg_tot: cut(r.total, totArr),
@@ -45,10 +51,10 @@ export async function GET(req: Request) {
   const tenantId = "tenant_demo";
 
   try {
-    const where: any = { tenantId };
+    const where: Prisma.CustomerWhereInput = { tenantId };
     if (q) where.email = { contains: q, mode: "insensitive" };
 
-    // Segment filtering
+    // Segment filtering (high/mid/low buckets)
     if (segment) {
       const basics = await prisma.customer.findMany({
         where: { tenantId },
@@ -73,8 +79,8 @@ export async function GET(req: Request) {
         })
         .map((r) => r.id);
 
-      // If none matched, force an empty result
-      where.id = { in: ids }; // Prisma treats in: [] as no matches
+      // If none matched, force empty result with an impossible IN list
+      where.id = ids.length ? { in: ids } : { in: ["__no_match__"] };
     }
 
     const [total, rawItems] = await Promise.all([
@@ -88,16 +94,19 @@ export async function GET(req: Request) {
           id: true,
           email: true,
           ordersCount: true,
-          totalSpent: true,   // Decimal/string
+          totalSpent: true, // Decimal
           createdAt: true,
         },
       }),
     ]);
 
-    // 🔧 Normalize totalSpent to number for the UI
+    // Normalize Prisma Decimal -> number for the UI
     const items = rawItems.map((c) => ({
-      ...c,
+      id: c.id,
+      email: c.email,
+      ordersCount: c.ordersCount,
       totalSpent: Number(c.totalSpent ?? 0),
+      createdAt: c.createdAt.toISOString(),
     }));
 
     return NextResponse.json({ total, page, pageSize, items });
