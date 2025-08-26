@@ -1,44 +1,44 @@
 "use client";
-import { useEffect, useState } from "react";
-import { Card, Loader, Center, Text, Group } from "@mantine/core";
-import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from "recharts";
 
-export default function SegmentsPie() {
-  const [data, setData] = useState<{ name: string; value: number }[] | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+import { useMemo } from "react";
+import { Card, Text, Center } from "@mantine/core";
+import { ResponsiveContainer, PieChart, Pie, Tooltip, Legend } from "recharts";
 
-  useEffect(() => {
-    fetch("/api/insights/segments")
-      .then(r => (r.ok ? r.json() : Promise.reject(r.statusText)))
-      .then(({ buckets }) => {
-        setData([
-          { name: "High value", value: buckets.high },
-          { name: "Mid value", value: buckets.mid },
-          { name: "Low value", value: buckets.low },
-        ]);
-      })
-      .catch(e => setErr(String(e)));
-  }, []);
+export type Slice = { name: string; value: number };
 
-  if (err) return <Card withBorder p="md"><Text c="red">Failed to load segments</Text></Card>;
-  if (!data) return <Card withBorder p="md"><Center className="h-40"><Loader /></Center></Card>;
+export default function SegmentsPie({ data = [] }: { data?: Slice[] }) {
+  const total = useMemo(
+    () => data.reduce((sum, d) => sum + (Number(d.value) || 0), 0),
+    [data]
+  );
+
+  const legendFmt = (value: string, entry: any) => {
+    const count = entry?.payload?.value ?? 0;
+    const pct = total ? Math.round((count / total) * 100) : 0;
+    return `${value} — ${count} (${pct}%)`;
+  };
 
   return (
     <Card withBorder radius="md" p="md">
-      <Group justify="space-between" mb="xs">
-        <Text fw={700}>Customer Segments</Text>
-        <Text size="sm" c="dimmed">Demo buckets</Text>
-      </Group>
-      <div style={{ height: 260 }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie dataKey="value" data={data} outerRadius={90} label />
-            {/* Recharts uses default colors; we won't specify colors per your setup */}
-            <Tooltip />
-            <Legend />
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
+      <Text fw={700} mb="xs">
+        Customer Segments
+      </Text>
+
+      {data.length === 0 || total === 0 ? (
+        <Center style={{ height: 240 }}>
+          <Text c="dimmed">No segment data</Text>
+        </Center>
+      ) : (
+        <div style={{ height: 280, minHeight: 280 }}>
+          <ResponsiveContainer>
+            <PieChart>
+              <Pie data={data} dataKey="value" nameKey="name" outerRadius={100} />
+              <Tooltip formatter={(v: number) => [`${v} customers`, "Count"]} />
+              <Legend formatter={legendFmt} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      )}
     </Card>
   );
 }

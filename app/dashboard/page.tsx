@@ -2,12 +2,10 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { Paper, Text, Group, Grid, GridCol, Title, Space, Button } from "@mantine/core";
-import KpiCard from "@/components/KpiCard";
+import { Paper, Text, Group, Title, Space, Button } from "@mantine/core";
+import Link from "next/link";
+import DashboardKpis from "@/components/DashboardKpis";
 import SalesChart from "@/components/SalesChart";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
@@ -16,49 +14,27 @@ export default async function DashboardPage() {
   const email = session.user?.email ?? "guest";
   const tenantId = session.user?.tenant_id ?? "tenant_demo";
 
-  const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-  const orders = await prisma.order.findMany({
-    where: { tenantId, createdAt: { gte: since } },
-    select: { total: true },
-  });
-
-  const totals = orders.map((o) => Number(o.total));
-  const revenue = totals.reduce((s, x) => s + x, 0);
-  const ordersCount = orders.length;
-  const AOV = ordersCount ? revenue / ordersCount : 0;
-  const conversion = (ordersCount / (30 * 1000)) * 100; // %
-
   return (
     <div className="p-6">
       <Group justify="space-between" mb="lg">
         <Title order={2}>Dashboard</Title>
-        <Button component="a" href="/api/auth/signout">Sign out</Button>
+        <Button component={Link} href="/api/auth/signout">Sign out</Button>
       </Group>
 
       <Paper withBorder p="lg" radius="md" mb="lg">
-        <Text size="lg">Hello <b>{tenantId}</b> ({email}) 👋</Text>
-        <Text c="dimmed" size="sm">You’re signed in. Below are live KPIs from your seeded database.</Text>
+        <Text size="lg">
+          Hello <b>{tenantId}</b> ({email}) 👋
+        </Text>
+        <Text c="dimmed" size="sm">
+          KPIs and charts below are computed from your seeded database.
+        </Text>
       </Paper>
 
-      <Grid gutter="md">
-        <GridCol span={{ base: 12, sm: 6, md: 3 }}>
-          <KpiCard label="Revenue (30d)" value={revenue} prefix="$" />
-        </GridCol>
-        <GridCol span={{ base: 12, sm: 6, md: 3 }}>
-          <KpiCard label="Orders (30d)" value={ordersCount} />
-        </GridCol>
-        <GridCol span={{ base: 12, sm: 6, md: 3 }}>
-          <KpiCard label="AOV (30d)" value={AOV} prefix="$" />
-        </GridCol>
-        <GridCol span={{ base: 12, sm: 6, md: 3 }}>
-          <KpiCard label="Conversion (demo)" value={conversion} suffix="%" />
-        </GridCol>
-        <GridCol span={12}>
-          <SalesChart days={90} />
-        </GridCol>
-      </Grid>
+      <DashboardKpis />
 
-      <Space h="xl" />
+      <Space h="lg" />
+
+      <SalesChart days={90} />
     </div>
   );
 }

@@ -6,7 +6,7 @@ import { MantineProvider } from "@mantine/core";
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider>
-      <MantineProvider>{children}</MantineProvider>
+      <MantineProvider defaultColorScheme="light">{children}</MantineProvider>
     </SessionProvider>
   );
 }

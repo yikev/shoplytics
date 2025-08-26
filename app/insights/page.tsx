@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import ForecastSpark from "@/components/ForecastSpark";
-import SegmentsPie from "@/components/SegmentsPie";
+import SegmentsCard from "@/components/SegmentsCard";
 import { Grid, GridCol, Title, Space } from "@mantine/core";
 
 export default async function InsightsPage() {
@@ -18,7 +18,7 @@ export default async function InsightsPage() {
           <ForecastSpark />
         </GridCol>
         <GridCol span={{ base: 12, md: 4 }}>
-          <SegmentsPie />
+          <SegmentsCard />
         </GridCol>
       </Grid>
     </>
